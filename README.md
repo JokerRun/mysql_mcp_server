@@ -24,9 +24,9 @@ Set the following environment variables:
 ```bash
 MYSQL_HOST=localhost     # Database host
 MYSQL_PORT=3306         # Optional: Database port (defaults to 3306 if not specified)
-MYSQL_USER=your_username
-MYSQL_PASSWORD=your_password
-MYSQL_DATABASE=your_database
+MYSQL_USER=root
+MYSQL_PASSWORD=000000
+MYSQL_DATABASE=ruoyi-vue-pro
 ```
 
 ## Usage
@@ -42,16 +42,42 @@ Add this to your `claude_desktop_config.json`:
       "command": "uv",
       "args": [
         "--directory", 
-        "path/to/mysql_mcp_server",
+        "path/to/mysql_mcp_server_root",
         "run",
         "mysql_mcp_server"
       ],
       "env": {
         "MYSQL_HOST": "localhost",
         "MYSQL_PORT": "3306",
-        "MYSQL_USER": "your_username",
-        "MYSQL_PASSWORD": "your_password",
-        "MYSQL_DATABASE": "your_database"
+        "MYSQL_USER": "root",
+        "MYSQL_PASSWORD": "000000",
+        "MYSQL_DATABASE": "ruoyi-vue-pro"
+      }
+    }
+  }
+}
+```
+
+### With Cursor
+
+
+```json
+{
+  "mcpServers": {
+    "mysql": {
+      "command": "uv",
+      "args": [
+        "--directory", 
+        "path/to/mysql_mcp_server_root",
+        "run",
+        "mysql_mcp_server"
+      ],
+      "env": {
+        "MYSQL_HOST": "localhost",
+        "MYSQL_PORT": "3306",
+        "MYSQL_USER": "root",
+        "MYSQL_PASSWORD": "000000",
+        "MYSQL_DATABASE": "ruoyi-vue-pro"
       }
     }
   }
@@ -123,3 +149,4 @@ MIT License - see LICENSE file for details.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+# Test Change

@@ -3,7 +3,16 @@ import logging
 import os
 from mysql.connector import connect, Error
 from mcp.server import Server
-from mcp.types import Resource, Tool, TextContent
+from mcp.types import (
+    Resource, 
+    Tool, 
+    TextContent, 
+    GetPromptRequest,
+    GetPromptResult,
+    Prompt, 
+    PromptMessage, 
+    PromptArgument
+)
 from pydantic import AnyUrl
 
 # Configure logging
@@ -20,7 +29,9 @@ def get_db_config():
         "port": int(os.getenv("MYSQL_PORT", "3306")),
         "user": os.getenv("MYSQL_USER"),
         "password": os.getenv("MYSQL_PASSWORD"),
-        "database": os.getenv("MYSQL_DATABASE")
+        "database": os.getenv("MYSQL_DATABASE"),
+        "charset": "utf8mb4",
+        "collation": "utf8mb4_general_ci"
     }
     
     if not all([config["user"], config["password"], config["database"]]):
@@ -112,40 +123,115 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     config = get_db_config()
     logger.info(f"Calling tool: {name} with arguments: {arguments}")
     
-    if name != "execute_sql":
+    if name == "execute_sql":
+        query = arguments.get("query")
+        if not query:
+            raise ValueError("Query is required")
+        
+        try:
+            with connect(**config) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query)
+                    
+                    # Special handling for SHOW TABLES
+                    if query.strip().upper().startswith("SHOW TABLES"):
+                        tables = cursor.fetchall()
+                        result = ["Tables_in_" + config["database"]]  # Header
+                        result.extend([table[0] for table in tables])
+                        return [TextContent(type="text", text="\n".join(result))]
+                    
+                    # Regular SELECT queries
+                    elif query.strip().upper().startswith("SELECT"):
+                        columns = [desc[0] for desc in cursor.description]
+                        rows = cursor.fetchall()
+                        result = [",".join(map(str, row)) for row in rows]
+                        return [TextContent(type="text", text="\n".join([",".join(columns)] + result))]
+                    
+                    # Non-SELECT queries
+                    else:
+                        conn.commit()
+                        return [TextContent(type="text", text=f"Query executed successfully. Rows affected: {cursor.rowcount}")]
+                    
+        except Error as e:
+            logger.error(f"Error executing SQL '{query}': {e}")
+            return [TextContent(type="text", text=f"Error executing query: {str(e)}")]
+            
+    elif name == "prompt_sql":
+        description = arguments.get("description")
+        if not description:
+            raise ValueError("Description is required")
+            
+        table_name = arguments.get("table_name", "")
+        
+        try:
+            with connect(**config) as conn:
+                with conn.cursor() as cursor:
+                    if table_name:
+                        cursor.execute(f"DESCRIBE {table_name}")
+                        columns = cursor.fetchall()
+                        schema_info = f"Table {table_name} columns:\n"
+                        schema_info += "\n".join([f"- {col[0]} ({col[1]})" for col in columns])
+                    else:
+                        cursor.execute("SHOW TABLES")
+                        tables = cursor.fetchall()
+                        schema_info = "Available tables:\n"
+                        schema_info += "\n".join([f"- {table[0]}" for table in tables])
+                        
+                    return [TextContent(type="text", text=f"""Database Schema Information:
+{schema_info}
+
+Your request: {description}
+
+Please use this information to construct your SQL query.""")]
+        
+        except Error as e:
+            logger.error(f"Error in prompt_sql: {str(e)}")
+            return [TextContent(type="text", text=f"Error getting schema information: {str(e)}")]
+    
+    else:
         raise ValueError(f"Unknown tool: {name}")
-    
-    query = arguments.get("query")
-    if not query:
-        raise ValueError("Query is required")
-    
-    try:
-        with connect(**config) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query)
-                
-                # Special handling for SHOW TABLES
-                if query.strip().upper().startswith("SHOW TABLES"):
-                    tables = cursor.fetchall()
-                    result = ["Tables_in_" + config["database"]]  # Header
-                    result.extend([table[0] for table in tables])
-                    return [TextContent(type="text", text="\n".join(result))]
-                
-                # Regular SELECT queries
-                elif query.strip().upper().startswith("SELECT"):
-                    columns = [desc[0] for desc in cursor.description]
-                    rows = cursor.fetchall()
-                    result = [",".join(map(str, row)) for row in rows]
-                    return [TextContent(type="text", text="\n".join([",".join(columns)] + result))]
-                
-                # Non-SELECT queries
-                else:
-                    conn.commit()
-                    return [TextContent(type="text", text=f"Query executed successfully. Rows affected: {cursor.rowcount}")]
-                
-    except Error as e:
-        logger.error(f"Error executing SQL '{query}': {e}")
-        return [TextContent(type="text", text=f"Error executing query: {str(e)}")]
+
+
+@app.list_resource_templates()
+async def list_resource_templates() -> list[Resource]:
+    """List available resource templates."""
+    logger.info("Listing resource templates...")
+    return []  # 返回空列表，因为MySQL服务器不需要资源模板
+
+@app.list_prompts()
+async def handle_list_prompts() -> list[Prompt]:
+    # Implementation
+    return [
+        Prompt(
+            name="generate_sql",
+            description="Generate an SQL query based on the user's request",
+            arguments=[
+                PromptArgument(name="description", description="The user's request")
+            ]
+        )
+    ]
+
+@app.get_prompt()
+async def handle_get_prompt(
+    name: str, arguments: dict[str, str] | None
+) -> GetPromptResult:
+    # Implementation
+    if name == "generate_sql":
+        description = arguments.get("description")
+        if not description:
+            raise ValueError("Description is required")
+        
+        return GetPromptResult(
+            name="generate_sql",
+            arguments={
+                "description": description
+            },
+            messages=[
+                PromptMessage(role="user", content=description)
+            ]   
+        )
+    else:
+        raise ValueError(f"Unknown prompt: {name}")
 
 async def main():
     """Main entry point to run the MCP server."""

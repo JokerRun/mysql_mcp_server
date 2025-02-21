@@ -22,3 +22,4 @@ uv.lock
 # Distribution directories
 *.dist-info/
 
+.mysql_mcp_server_for_cursor.sh

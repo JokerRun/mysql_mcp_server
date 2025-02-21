@@ -60,28 +60,33 @@ Add this to your `claude_desktop_config.json`:
 
 ### With Cursor
 
+#### with docker
+```bash
+docker build -t mysql-mcp-server . # build images
 
-```json
-{
-  "mcpServers": {
-    "mysql": {
-      "command": "uv",
-      "args": [
-        "--directory", 
-        "path/to/mysql_mcp_server_root",
-        "run",
-        "mysql_mcp_server"
-      ],
-      "env": {
-        "MYSQL_HOST": "localhost",
-        "MYSQL_PORT": "3306",
-        "MYSQL_USER": "root",
-        "MYSQL_PASSWORD": "000000",
-        "MYSQL_DATABASE": "ruoyi-vue-pro"
-      }
-    }
-  }
-}
+docker run -i --rm -e MYSQL_HOST=$MYSQL_HOST -e MYSQL_PORT=$MYSQL_PORT -e MYSQL_USER=$MYSQL_USER -e MYSQL_PASSWORD=$MYSQL_PASSWORD -e MYSQL_DATABASE=$MYSQL_DATABASE mysql-mcp-server
+# MYSQL_HOST=host.docker.internal for docker container
+```
+
+#### with uv
+> [!TIP]
+> Cursor can't provide environmental variables to MCP Servers.
+> https://forum.cursor.com/t/how-to-use-the-mcp-servers-the-sse-url/46177/6?u=jokerrun
+> Super Thanks to DaleLJefferson
+
+add files: mysql_mcp_server_for_cursor_by_uv.sh
+```bash
+# mysql_mcp_server_for_cursor.sh
+export MYSQL_HOST=localhost
+export MYSQL_PORT=3306
+export MYSQL_USER=root 
+export MYSQL_PASSWORD=000000
+export MYSQL_DATABASE=ruoyi-vue-pro
+uv run --directory $this_repo_root mysql_mcp_server
+```
+Cursor MCP Server:
+```
+sh $this_repo_root/mysql_mcp_server_for_cursor_by_uv.sh
 ```
 
 ### As a standalone server
